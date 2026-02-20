@@ -19,7 +19,7 @@ A zero-dependency, single-file reconnaissance tool that auto-generates Google Do
 
 ## ⚡ Features
 
-- **500+ Google Dorks** — organized across 11 categories, each opens a search in one click
+- **100+ Google Dorks** — organized across 11 categories, each opens a search in one click
 - **Live query preview** — hover any button to instantly see the constructed dork query
 - **Real-time filter** — search dorks by keyword or filter by category
 - **Threat Intel integrations** — Shodan, Censys, ZoomEye, Fofa, GreyNoise, DNSdumpster, ViewDNS, and more
