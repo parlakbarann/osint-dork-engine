@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Browser-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/Version-2.1-green?style=flat-square" alt="Version">
-  <img src="https://img.shields.io/badge/Dorks-500%2B-orange?style=flat-square" alt="Dorks">
+  <img src="https://img.shields.io/badge/Dorks-100%2B-orange?style=flat-square" alt="Dorks">
   <img src="https://img.shields.io/badge/License-Educational-red?style=flat-square" alt="License">
 </p>
 
