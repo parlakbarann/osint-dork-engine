@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bug Bounty Search Engine v2.1</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050a0e;
+            --panel: #0a1520;
+            --border: #1a3a5c;
+            --accent: #00d4ff;
+            --accent2: #ff4d00;
+            --green: #00ff88;
+            --text: #c8e8f0;
+            --muted: #4a7090;
+            --danger: #ff2244;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Rajdhani', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+            animation: gridMove 20s linear infinite;
+        }
+        @keyframes gridMove { 0% { transform: translateY(0); } 100% { transform: translateY(40px); } }
+        .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 20px 30px; }
+        .header-tag { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--accent); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 12px; opacity: 0.7; }
+        header h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: #fff; text-shadow: 0 0 30px rgba(0,212,255,0.5), 0 0 60px rgba(0,212,255,0.2); line-height: 1.1; }
+        header h1 span { color: var(--accent); }
+        .header-sub { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 10px; letter-spacing: 2px; }
+        .blink { animation: blink 1.2s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .search-section { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px 24px; margin-bottom: 24px; position: sticky; top: 8px; z-index: 100; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,255,0.1); backdrop-filter: blur(8px); }
+        .search-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+        .search-label { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        #target { width: 100%; padding: 12px 16px; font-family: 'Share Tech Mono', monospace; font-size: 15px; background: rgba(0,212,255,0.04); border: 1px solid var(--border); border-radius: 3px; color: var(--accent); outline: none; transition: all 0.2s; letter-spacing: 1px; }
+        #target:focus { border-color: var(--accent); background: rgba(0,212,255,0.08); box-shadow: 0 0 20px rgba(0,212,255,0.15); }
+        #target::placeholder { color: var(--muted); }
+        .query-preview { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 10px; padding: 8px 12px; background: rgba(0,0,0,0.3); border-left: 2px solid var(--border); border-radius: 2px; min-height: 28px; word-break: break-all; transition: color 0.2s, border-color 0.2s; }
+        .query-preview.active { color: var(--green); border-left-color: var(--green); }
+        .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filter-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+        #filterInput { padding: 7px 14px; font-family: 'Share Tech Mono', monospace; font-size: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; color: var(--text); outline: none; width: 220px; transition: all 0.2s; }
+        #filterInput:focus { border-color: var(--accent); }
+        #filterInput::placeholder { color: var(--muted); opacity: 0.6; }
+        .cat-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+        .cat-btn { padding: 5px 12px; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 1px; background: transparent; border: 1px solid var(--border); border-radius: 2px; color: var(--muted); cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+        .cat-btn:hover, .cat-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+        .categories { display: flex; flex-direction: column; gap: 20px; }
+        .category { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .cat-header { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; background: rgba(0,0,0,0.2); user-select: none; border-bottom: 1px solid var(--border); }
+        .cat-name { font-weight: 700; font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+        .cat-count { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--muted); margin-left: auto; }
+        .cat-toggle { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--muted); transition: transform 0.3s; }
+        .category.collapsed .cat-toggle { transform: rotate(-90deg); }
+        .cat-body { padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .category.collapsed .cat-body { display: none; }
+        .dork-btn { padding: 9px 16px; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px; background: rgba(0,212,255,0.04); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; transition: all 0.2s; }
+        .dork-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); transform: translateY(-1px); }
+        .dork-btn.danger-btn { border-color: rgba(255,34,68,0.25); color: rgba(255,120,120,0.8); }
+        .dork-btn.danger-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(255,34,68,0.06); }
+        .dork-btn.hidden { display: none; }
+        .stats-bar { display: flex; gap: 24px; padding: 12px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+        .stat { display: flex; align-items: center; gap: 8px; }
+        .stat-val { font-family: 'Share Tech Mono', monospace; font-size: 20px; font-weight: bold; color: var(--accent); }
+        .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+        footer { text-align: center; padding: 30px; font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; opacity: 0.5; }
+        .author-link { display: inline-flex; align-items: center; gap: 8px; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted); text-decoration: none; letter-spacing: 2px; border: 1px solid var(--border); padding: 7px 18px; border-radius: 3px; transition: all 0.25s; opacity: 1; margin-top: 4px; }
+        .author-link:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px rgba(0,212,255,0.15); }
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--green); border-radius: 4px; padding: 12px 20px; font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--green); z-index: 9998; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; max-width: 380px; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <header>
+        <div class="header-tag">// RECONNAISSANCE TOOLKIT v2.1</div>
+        <h1>BUG BOUNTY <span>SEARCH</span> ENGINE</h1>
+        <div class="header-sub">GOOGLE DORKS &amp; OSINT AUTOMATION <span class="blink">&#9608;</span></div>
+    </header>
+
+    <div class="stats-bar">
+        <div class="stat"><span class="stat-val" id="totalDorks">0</span><span class="stat-label">Total Dorks</span></div>
+        <div class="stat"><span class="stat-val" id="visibleDorks">0</span><span class="stat-label">Visible</span></div>
+        <div class="stat"><span class="stat-val" id="searchCount">0</span><span class="stat-label">Searches</span></div>
+        <div class="stat" style="margin-left:auto"><span class="stat-label" id="statusText" style="color:var(--muted)">AWAITING TARGET</span></div>
+    </div>
+
+    <div class="search-section">
+        <label class="search-label" for="target">&#9658; TARGET DOMAIN</label>
+        <input type="text" id="target" placeholder="example.com" autocomplete="off" spellcheck="false">
+        <div class="query-preview" id="queryPreview">// Hover over any button to preview the dork query</div>
+    </div>
+
+    <div class="filter-row">
+        <span class="filter-label">FILTER:</span>
+        <input type="text" id="filterInput" placeholder="search dorks..." oninput="filterDorks()">
+        <div class="cat-filter" id="catFilter"></div>
+        <button class="cat-btn" onclick="resetFilter()" style="margin-left:auto;border-color:rgba(255,34,68,0.3);color:rgba(255,100,100,0.6)">RESET</button>
+    </div>
+
+    <div class="categories" id="categories"></div>
+
+    <footer>
+        RECON ENGINE &nbsp;|&nbsp; FOR AUTHORIZED TESTING ONLY &nbsp;|&nbsp; USE RESPONSIBLY
+        <br><br>
+        <a href="https://github.com/parlakbarann" target="_blank" class="author-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            github.com/parlakbarann
+        </a>
+    </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var DORKS = [
+    // File Discovery
+    {id:1,  label:"Directory Listing",          cat:"File Discovery",
+     q:function(d){return "site:"+d+" intitle:index.of";}},
+    {id:2,  label:"Config Files",               cat:"File Discovery",
+     q:function(d){return "site:"+d+" ext:xml | ext:conf | ext:cnf | ext:reg | ext:inf | ext:rdp | ext:cfg | ext:txt | ext:ora | ext:ini";}},
+    {id:3,  label:"Database Files",             cat:"File Discovery",
+     q:function(d){return "site:"+d+" ext:sql | ext:dbf | ext:mdb";}},
+    {id:4,  label:"Log Files",                  cat:"File Discovery",
+     q:function(d){return "site:"+d+" ext:log";}},
+    {id:5,  label:"Backup / Old Files",         cat:"File Discovery",
+     q:function(d){return "site:"+d+" ext:bkf | ext:bkp | ext:bak | ext:old | ext:backup";}},
+    {id:8,  label:"Public Documents",           cat:"File Discovery",
+     q:function(d){return "site:"+d+" ext:doc | ext:docx | ext:odt | ext:pdf | ext:rtf | ext:ppt | ext:pptx | ext:csv";}},
+    {id:41, label:"main.yml File",              cat:"File Discovery",
+     q:function(d){return "site:"+d+' intitle:"index of" "main.yml"';}},
+    {id:46, label:"conf.php Exposed",           cat:"File Discovery",
+     q:function(d){return "site:"+d+" intitle:index.of conf.php";}},
+    {id:59, label:"MySQL Config File",          cat:"File Discovery",
+     q:function(d){return "site:"+d+" intitle:index.of conf.mysql";}},
+    {id:60, label:"YAML Credentials",           cat:"File Discovery",
+     q:function(d){return "site:"+d+' intitle:"index of" "users.yml" | "admin.yml" | "config.yml"';}},
+    {id:61, label:"Docker Compose",             cat:"File Discovery",
+     q:function(d){return "site:"+d+' intitle:"index of" "docker-compose.yml"';}},
+    {id:62, label:"Maven pom.xml",              cat:"File Discovery",
+     q:function(d){return "site:"+d+' intext:pom.xml intitle:"index of /"';}},
+    {id:63, label:"/etc Directory Listing",     cat:"File Discovery",
+     q:function(d){return "site:"+d+' intext:"Index of" intext:"/etc"';}},
+
+    // Vulnerabilities
+    {id:6,  label:"Login Pages",                cat:"Vulnerabilities",
+     q:function(d){return "site:"+d+" inurl:login";}},
+    {id:7,  label:"SQL Errors",                 cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+' intext:"sql syntax near" | intext:"syntax error has occurred" | intext:"incorrect syntax near" | intext:"Warning: mysql_connect()" | intext:"Warning: mysql_query()" | intext:"Warning: pg_connect()"';}},
+    {id:9,  label:"phpinfo() Pages",            cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+' ext:php intitle:phpinfo "published by the PHP Group"';}},
+    {id:11, label:"Backdoors",                  cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+" inurl:shell | inurl:backdoor | inurl:wso | inurl:cmd | shadow | passwd | boot.ini";}},
+    {id:13, label:"Open Redirects",             cat:"Vulnerabilities",
+     q:function(d){return "site:"+d+" inurl:redir | inurl:url | inurl:redirect | inurl:return | inurl:src=http | inurl:r=http";}},
+    {id:14, label:"Apache Struts RCE",          cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+" ext:action | ext:struts | ext:do";}},
+    {id:38, label:"GeoServer RCE (CVE-2024)",   cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+' inurl:"/geoserver/ows?service=wfs"';}},
+    {id:53, label:"SQL Injection URL",          cat:"Vulnerabilities", danger:true,
+     q:function(d){return "site:"+d+' inurl:"php?sql=select" ext:php';}},
+    {id:64, label:"SQL Install Directories",    cat:"Vulnerabilities",
+     q:function(d){return "site:"+d+' "sql" "parent" intitle:index.of -injection';}},
+
+    // CMS / Frameworks
+    {id:10, label:"Find WordPress",             cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:wp- | inurl:wp-content | inurl:plugins | inurl:uploads | inurl:themes | inurl:download";}},
+    {id:20, label:"WordPress Includes",         cat:"CMS / Frameworks",
+     q:function(d){return "inurl:wp-content | inurl:wp-includes "+d;}},
+    {id:40, label:"wp-content Juicy Info",      cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:/wp-content/uploads/wpo_wcpdf";}},
+    {id:44, label:"File Upload Page",           cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:uploadimage.php";}},
+    {id:45, label:"Contact Form 7 Plugin",      cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:*/wp-content/plugins/contact-form-7/";}},
+    {id:50, label:"WP Juicy File #2",           cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:wp-content/uploads/wcpa_uploads";}},
+    {id:51, label:"Drupal Login",               cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+' inurl:user intitle:"Drupal" intext:"Log in" -"powered by"';}},
+    {id:52, label:"Joomla Database",            cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+" inurl:/libraries/joomla/database/";}},
+    {id:54, label:"WP Config Exposed",          cat:"CMS / Frameworks", danger:true,
+     q:function(d){return "site:"+d+' inurl:"wp-content" intitle:"index.of" intext:wp-config.php';}},
+    {id:58, label:"WP Backup Files",            cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+' inurl:"wp-content" intitle:"index.of" intext:backup';}},
+    {id:39, label:"ArcGIS REST Services",       cat:"CMS / Frameworks",
+     q:function(d){return "site:"+d+' intext:"ArcGIS REST Services Directory" intitle:"Folder: /"';}},
+
+    // Sensitive Data
+    {id:12, label:"Install / Setup Files",      cat:"Sensitive Data",
+     q:function(d){return "site:"+d+" inurl:readme | inurl:license | inurl:install | inurl:setup | inurl:config";}},
+    {id:17, label:".htaccess / .git Leak",      cat:"Sensitive Data", danger:true,
+     q:function(d){return 'inurl:"/phpinfo.php" | inurl:".htaccess" | inurl:"/.git" '+d+' -github';}},
+    {id:42, label:"Admin Portal",               cat:"Sensitive Data",
+     q:function(d){return "site:"+d+" inurl:/admin.aspx";}},
+    {id:47, label:"Sharing API Info",           cat:"Sensitive Data",
+     q:function(d){return "site:"+d+' intitle:"Sharing API Info"';}},
+    {id:48, label:"Admin Backup Zip",           cat:"Sensitive Data", danger:true,
+     q:function(d){return "site:"+d+' intitle:"Index of" inurl:/backup/ "admin.zip"';}},
+    {id:49, label:"GitHub API Key",             cat:"Sensitive Data", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" github-api';}},
+    {id:55, label:"JSON-RPC Endpoints",         cat:"Sensitive Data",
+     q:function(d){return "site:"+d+' intext:"index of" inurl:json-rpc';}},
+    {id:56, label:"File Download Parameter",    cat:"Sensitive Data",
+     q:function(d){return "site:"+d+' intitle:"index of" "download.php?file="';}},
+    {id:57, label:"JWKS RSA Key",               cat:"Sensitive Data", danger:true,
+     q:function(d){return "site:"+d+' intext:"index of" inurl:jwks-rsa';}},
+
+    // Recon / OSINT
+    {id:18, label:"Subdomains",                 cat:"Recon / OSINT",
+     q:function(d){return "site:*."+d;},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent("site:*."+d);}},
+    {id:19, label:"Sub-Subdomains",             cat:"Recon / OSINT",
+     q:function(d){return "site:*.*."+d;},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent("site:*.*."+d);}},
+    {id:21, label:"GitHub Code Search",         cat:"Recon / OSINT",
+     q:function(d){return '"*.'+d+'" on GitHub';},
+     u:function(d){return "https://github.com/search?q="+encodeURIComponent('"*.'+d+'"')+"&type=host";}},
+    {id:15, label:"Pastebin Leaks",             cat:"Recon / OSINT",
+     q:function(d){return "site:pastebin.com "+d;},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent("site:pastebin.com "+d);}},
+    {id:16, label:"LinkedIn Employees",         cat:"Recon / OSINT",
+     q:function(d){return "site:linkedin.com employees "+d;},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent("site:linkedin.com employees "+d);}},
+    {id:32, label:"Reddit Mentions",            cat:"Recon / OSINT",
+     q:function(d){return "reddit: "+d;},
+     u:function(d){return "https://www.reddit.com/search/?q="+encodeURIComponent(d)+"&source=recent";}},
+    {id:22, label:"CrossDomain.xml",            cat:"Recon / OSINT",
+     q:function(d){return "http://"+d+"/crossdomain.xml";},
+     u:function(d){return "http://"+d+"/crossdomain.xml";}},
+    {id:30, label:"crt.sh (Cert Transparency)", cat:"Recon / OSINT",
+     q:function(d){return "crt.sh/?q=%."+d;},
+     u:function(d){return "https://crt.sh/?q=%25."+d;}},
+    {id:31, label:"OpenBugBounty",              cat:"Recon / OSINT",
+     q:function(d){return "openbugbounty.org: "+d;},
+     u:function(d){return "https://www.openbugbounty.org/search/?search="+encodeURIComponent(d)+"&type=host";}},
+    {id:23, label:"ThreatCrowd",                cat:"Recon / OSINT",
+     q:function(d){return "threatcrowd.org: "+d;},
+     u:function(d){return "http://threatcrowd.org/domain.php?domain="+d;}},
+
+    // Web Archive
+    {id:28, label:"Web Archive #1",             cat:"Web Archive",
+     q:function(d){return "web.archive.org/web/*/(*."+d+")";},
+     u:function(d){return "https://web.archive.org/web/*/("+encodeURIComponent("."+d)+")";}},
+    {id:29, label:"Web Archive #2",             cat:"Web Archive",
+     q:function(d){return "web.archive.org/web/*/"+d+"/*";},
+     u:function(d){return "https://web.archive.org/web/*/"+encodeURIComponent(d)+"/*";}},
+    {id:26, label:"Archive SWF Files",          cat:"Web Archive",
+     q:function(d){return "web.archive.org CDX SWF: "+d;},
+     u:function(d){return "https://web.archive.org/cdx/search?url="+encodeURIComponent(d)+"/&matchType=domain&collapse=urlkey&output=text&fl=original&filter=urlkey:.*swf&limit=100000";}},
+    {id:27, label:"Archive MIME-SWF",           cat:"Web Archive",
+     q:function(d){return "web.archive.org CDX MIME-SWF: "+d;},
+     u:function(d){return "https://web.archive.org/cdx/search?url="+encodeURIComponent(d)+"/&matchType=domain&collapse=urlkey&output=text&fl=original&filter=mimetype:application/x-shockwave-flash&limit=100000";}},
+    {id:24, label:"Find SWF (Google)",          cat:"Web Archive",
+     q:function(d){return "+inurl:"+d+" +ext:swf";},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent("+inurl:"+d+" +ext:swf");}},
+    {id:25, label:"MIME-SWF (Yandex)",          cat:"Web Archive",
+     q:function(d){return "site:"+d+" mime:swf";},
+     u:function(d){return "https://yandex.com/search/?text="+encodeURIComponent("site:"+d+" mime:swf");}},
+
+    // Threat Intel
+    {id:34,  label:"Censys IPv4",               cat:"Threat Intel",
+     q:function(d){return "censys.io/ipv4: "+d;},
+     u:function(d){return "https://search.censys.io/hosts?q="+encodeURIComponent(d);}},
+    {id:35,  label:"Censys Domain",             cat:"Threat Intel",
+     q:function(d){return "censys.io/domain: "+d;},
+     u:function(d){return "https://search.censys.io/certificates?q="+encodeURIComponent(d);}},
+    {id:36,  label:"Censys Certificates",       cat:"Threat Intel",
+     q:function(d){return "censys.io/certs: "+d;},
+     u:function(d){return "https://search.censys.io/certificates?q="+encodeURIComponent("parsed.names: "+d);}},
+    {id:37,  label:"Shodan",                    cat:"Threat Intel",
+     q:function(d){return "shodan: "+d;},
+     u:function(d){return "https://www.shodan.io/search?query="+encodeURIComponent(d);}},
+    {id:101, label:"ZoomEye",                   cat:"Threat Intel",
+     q:function(d){return "zoomeye: "+d;},
+     u:function(d){return "https://www.zoomeye.org/searchResult?q="+encodeURIComponent(d);}},
+    {id:102, label:"Fofa.so",                   cat:"Threat Intel",
+     q:function(d){return 'fofa: domain="'+d+'"';},
+     u:function(d){return "https://en.fofa.info/result?qbase64="+btoa('domain="'+d+'"');}},
+    {id:103, label:"GreyNoise",                 cat:"Threat Intel",
+     q:function(d){return "greynoise: "+d;},
+     u:function(d){return "https://viz.greynoise.io/query?gnql="+encodeURIComponent("metadata.rdns: "+d);}},
+    {id:104, label:"DNSdumpster",               cat:"Threat Intel", dnsNote:true,
+     q:function(d){return "dnsdumpster.com -> "+d+" (form tabanlı)";},
+     u:function(d){return "https://dnsdumpster.com/";}},
+    {id:105, label:"Who.is WHOIS",              cat:"Threat Intel",
+     q:function(d){return "who.is/whois/"+d;},
+     u:function(d){return "https://who.is/whois/"+d;}},
+    {id:106, label:"ViewDNS - DNS Report",      cat:"Threat Intel",
+     q:function(d){return "viewdns.info/dnsreport: "+d;},
+     u:function(d){return "https://viewdns.info/dnsreport/?host="+d;}},
+    {id:107, label:"ViewDNS - Reverse IP",      cat:"Threat Intel",
+     q:function(d){return "viewdns.info/reverseip: "+d;},
+     u:function(d){return "https://viewdns.info/reverseip/?host="+d;}},
+    {id:108, label:"ViewDNS - IP History",      cat:"Threat Intel",
+     q:function(d){return "viewdns.info/iphistory: "+d;},
+     u:function(d){return "https://viewdns.info/iphistory/?domain="+d;}},
+    {id:109, label:"ViewDNS - Reverse MX",      cat:"Threat Intel",
+     q:function(d){return "viewdns.info/reversemx: "+d;},
+     u:function(d){return "https://viewdns.info/reversemx/?mx="+d;}},
+    {id:110, label:"ViewDNS - WHOIS",           cat:"Threat Intel",
+     q:function(d){return "viewdns.info/whois: "+d;},
+     u:function(d){return "https://viewdns.info/whois/?domain="+d;}},
+
+    // API Key / Cloud Leaks
+    {id:200, label:"API Key Exposure",          cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"api_key" | intext:"api_secret" | intext:"client_secret"';}},
+    {id:201, label:"AWS Access Key",            cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"AKIA" | intext:"AWS_ACCESS_KEY_ID" | intext:"AWS_SECRET_ACCESS_KEY"';}},
+    {id:202, label:"AWS S3 Bucket",             cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' inurl:"s3.amazonaws.com"';}},
+    {id:203, label:"Firebase URL",              cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' inurl:"firebaseio.com"';}},
+    {id:204, label:"Google API Key",            cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"AIza" | intext:"google_api_key"';}},
+    {id:205, label:"Slack Webhook",             cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"hooks.slack.com/services"';}},
+    {id:206, label:"Stripe Secret Key",         cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"sk_live_" | intext:"rk_live_"';}},
+    {id:207, label:"Twilio Credentials",        cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"auth_token" intext:"twilio"';}},
+    {id:208, label:"SendGrid API Key",          cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"SG." intext:"sendgrid"';}},
+    {id:209, label:"Bearer Token",              cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"Authorization: Bearer"';}},
+    {id:210, label:"Azure Key Leak",            cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"DefaultEndpointsProtocol=https" | intext:"AccountKey="';}},
+    {id:211, label:"GCP Service Account",       cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"type: service_account" | intext:"private_key_id"';}},
+    {id:212, label:"Pastebin API Leak",         cat:"API Key / Cloud Leaks", danger:true,
+     q:function(d){return "site:pastebin.com "+d+' "api_key"';},
+     u:function(d){return "https://www.google.com/search?q="+encodeURIComponent('site:pastebin.com "'+d+'" "api_key" | "api_secret"');}},
+
+    // DevOps / CI-CD
+    {id:300, label:"Jenkins Dashboard",         cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' intitle:"Dashboard [Jenkins]"';}},
+    {id:301, label:"Jenkins Build",             cat:"DevOps / CI-CD Panels",
+     q:function(d){return "site:"+d+' inurl:"/job/" intitle:"Jenkins"';}},
+    {id:302, label:"GitLab Login",              cat:"DevOps / CI-CD Panels",
+     q:function(d){return "site:"+d+' inurl:"/users/sign_in" intitle:"GitLab"';}},
+    {id:303, label:"Kibana Panel",              cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' intitle:"Kibana" inurl:5601';}},
+    {id:304, label:"Elasticsearch Open",        cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' inurl:9200 intitle:"index of"';}},
+    {id:305, label:"Grafana Login",             cat:"DevOps / CI-CD Panels",
+     q:function(d){return "site:"+d+' intitle:"Grafana" inurl:/login';}},
+    {id:306, label:"Prometheus Metrics",        cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' inurl:/metrics intitle:"Prometheus"';}},
+    {id:307, label:"Spring Boot Actuator (env)",cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+" inurl:/actuator/env";}},
+    {id:308, label:"Spring Boot Actuator (all)",cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+" inurl:/actuator/beans | inurl:/actuator/trace | inurl:/actuator/dump";}},
+    {id:309, label:"Docker Registry API",       cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+" inurl:/v2/_catalog";}},
+    {id:310, label:"Kubernetes Dashboard",      cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' intitle:"Kubernetes Dashboard"';}},
+    {id:311, label:"Travis CI Config",          cat:"DevOps / CI-CD Panels",
+     q:function(d){return "site:"+d+' inurl:".travis.yml"';}},
+    {id:312, label:"CircleCI Config",           cat:"DevOps / CI-CD Panels",
+     q:function(d){return "site:"+d+' intitle:"index of" ".circleci/config.yml"';}},
+    {id:313, label:"Ansible Playbook/Vault",    cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" "playbook.yml" | "vault.yml"';}},
+    {id:314, label:"Terraform tfstate",         cat:"DevOps / CI-CD Panels", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" "terraform.tfstate"';}},
+
+    // API Documentation
+    {id:400, label:"Swagger UI",                cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:/swagger-ui | inurl:/swagger-ui.html";}},
+    {id:401, label:"OpenAPI / api-docs",        cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:/api-docs | inurl:/openapi.json | inurl:/openapi.yaml";}},
+    {id:402, label:"GraphQL Endpoint",          cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:/graphql | inurl:/graphiql | inurl:/playground";}},
+    {id:403, label:"WSDL / WADL File",          cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:?wsdl | inurl:?wadl ext:wsdl | ext:wadl";}},
+    {id:404, label:"API v1/v2/v3 Endpoints",    cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:/api/v1 | inurl:/api/v2 | inurl:/api/v3";}},
+    {id:405, label:"Postman Collection",        cat:"API Documentation",
+     q:function(d){return "site:"+d+' intitle:"index of" "collection.json"';}},
+    {id:406, label:"RapidAPI Key Leak",         cat:"API Documentation", danger:true,
+     q:function(d){return "site:"+d+' intext:"x-rapidapi-key" | intext:"x-rapidapi-host"';}},
+    {id:407, label:"REST Console",              cat:"API Documentation",
+     q:function(d){return "site:"+d+" inurl:/rest-console | inurl:/api-explorer";}},
+
+    // Env & Key Leaks
+    {id:500, label:".env File Exposed",         cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" ".env"';}},
+    {id:501, label:"DB Password in env",        cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"DB_PASSWORD" | intext:"APP_SECRET" | intext:"DB_CONNECTION"';}},
+    {id:502, label:"SSH Private Key",           cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" "id_rsa" | "id_dsa" | "id_ecdsa"';}},
+    {id:503, label:"PEM / P12 Certificate",     cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" ".pem" | ".key" | ".p12"';}},
+    {id:504, label:"NPM Auth Token",            cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"_authToken" | intext:"//registry.npmjs.org/:_authToken"';}},
+    {id:505, label:"Composer Auth (GitHub)",    cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" "auth.json" intext:"github-oauth"';}},
+    {id:506, label:".netrc Password File",      cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intitle:"index of" ".netrc"';}},
+    {id:507, label:"Django SECRET_KEY",         cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"SECRET_KEY" ext:py | ext:env';}},
+    {id:508, label:"Laravel APP_KEY",           cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' intext:"APP_KEY=base64:" | intext:"APP_ENV=production"';}},
+    {id:509, label:"Password in URL",           cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' inurl:"password=" | inurl:"passwd=" | inurl:"pass="';}},
+    {id:510, label:"Git Config Exposed",        cat:"Env & Key Leaks", danger:true,
+     q:function(d){return "site:"+d+' inurl:"/.git/config"';}}
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+var searchCount = 0;
+var activeCategory = null;
+
+// ─── BUILD UI ────────────────────────────────────────────────────────────────
+function buildUI() {
+    var cats = [];
+    for (var i = 0; i < DORKS.length; i++) {
+        if (cats.indexOf(DORKS[i].cat) === -1) cats.push(DORKS[i].cat);
+    }
+
+    var container = document.getElementById("categories");
+    var catFilterEl = document.getElementById("catFilter");
+
+    for (var ci = 0; ci < cats.length; ci++) {
+        (function(cat) {
+            var btn = document.createElement("button");
+            btn.className = "cat-btn";
+            btn.textContent = cat;
+            btn.onclick = function() { toggleCatFilter(btn, cat); };
+            catFilterEl.appendChild(btn);
+        })(cats[ci]);
+    }
+
+    for (var ci = 0; ci < cats.length; ci++) {
+        (function(cat) {
+            var items = DORKS.filter(function(d) { return d.cat === cat; });
+            var panel = document.createElement("div");
+            panel.className = "category";
+            panel.setAttribute("data-cat", cat);
+            panel.innerHTML =
+                '<div class="cat-header" onclick="toggleCategory(this.parentElement)">' +
+                '<span class="cat-name">' + cat + '</span>' +
+                '<span class="cat-count">' + items.length + ' dorks</span>' +
+                '<span class="cat-toggle">&#9662;</span>' +
+                '</div><div class="cat-body"></div>';
+
+            var body = panel.querySelector(".cat-body");
+            for (var ii = 0; ii < items.length; ii++) {
+                (function(dork) {
+                    var btn = document.createElement("button");
+                    btn.className = "dork-btn" + (dork.danger ? " danger-btn" : "");
+                    btn.setAttribute("data-label", dork.label.toLowerCase());
+                    btn.textContent = dork.label;
+                    btn.addEventListener("mouseenter", function() { previewQuery(dork); });
+                    btn.addEventListener("mouseleave", clearPreview);
+                    btn.addEventListener("click", function() { runDork(dork); });
+                    body.appendChild(btn);
+                })(items[ii]);
+            }
+            container.appendChild(panel);
+        })(cats[ci]);
+    }
+
+    document.getElementById("totalDorks").textContent = DORKS.length;
+    document.getElementById("visibleDorks").textContent = DORKS.length;
+}
+
+function toggleCategory(el) { el.classList.toggle("collapsed"); }
+
+// ─── FILTER ──────────────────────────────────────────────────────────────────
+function filterDorks() {
+    var q = document.getElementById("filterInput").value.toLowerCase();
+    var buttons = document.querySelectorAll(".dork-btn");
+    var visible = 0;
+    for (var i = 0; i < buttons.length; i++) {
+        var btn = buttons[i];
+        var labelMatch = btn.getAttribute("data-label").indexOf(q) !== -1;
+        var catMatch = !activeCategory || btn.closest(".category").getAttribute("data-cat") === activeCategory;
+        var show = labelMatch && catMatch;
+        if (show) { btn.classList.remove("hidden"); visible++; }
+        else { btn.classList.add("hidden"); }
+    }
+    var panels = document.querySelectorAll(".category");
+    for (var pi = 0; pi < panels.length; pi++) {
+        var p = panels[pi];
+        var vis = p.querySelectorAll(".dork-btn:not(.hidden)").length > 0;
+        p.style.display = vis ? "" : "none";
+        if (vis && p.classList.contains("collapsed")) p.classList.remove("collapsed");
+    }
+    document.getElementById("visibleDorks").textContent = visible;
+}
+
+function toggleCatFilter(btnEl, cat) {
+    var allBtns = document.querySelectorAll(".cat-btn");
+    if (activeCategory === cat) {
+        activeCategory = null;
+        for (var i = 0; i < allBtns.length; i++) allBtns[i].classList.remove("active");
+    } else {
+        activeCategory = cat;
+        for (var i = 0; i < allBtns.length; i++) allBtns[i].classList.remove("active");
+        btnEl.classList.add("active");
+    }
+    filterDorks();
+}
+
+function resetFilter() {
+    activeCategory = null;
+    document.getElementById("filterInput").value = "";
+    var allCatBtns = document.querySelectorAll(".cat-btn");
+    for (var i = 0; i < allCatBtns.length; i++) allCatBtns[i].classList.remove("active");
+    var allDorkBtns = document.querySelectorAll(".dork-btn");
+    for (var i = 0; i < allDorkBtns.length; i++) allDorkBtns[i].classList.remove("hidden");
+    var allPanels = document.querySelectorAll(".category");
+    for (var i = 0; i < allPanels.length; i++) allPanels[i].style.display = "";
+    document.getElementById("visibleDorks").textContent = DORKS.length;
+}
+
+// ─── RUN ─────────────────────────────────────────────────────────────────────
+function getDomain() {
+    return document.getElementById("target").value.trim()
+        .replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function previewQuery(dork) {
+    var d = getDomain() || "example.com";
+    var el = document.getElementById("queryPreview");
+    el.textContent = "// " + dork.q(d);
+    el.classList.add("active");
+}
+
+function clearPreview() {
+    var el = document.getElementById("queryPreview");
+    el.textContent = "// Hover over any button to preview the dork query";
+    el.classList.remove("active");
+}
+
+function runDork(dork) {
+    var d = getDomain();
+    if (!d) {
+        showToast("WARNING: Please enter a target domain first", true);
+        document.getElementById("target").focus();
+        return;
+    }
+    var finalUrl;
+    if (typeof dork.u === "function") {
+        finalUrl = dork.u(d);
+    } else {
+        finalUrl = "https://www.google.com/search?q=" + encodeURIComponent(dork.q(d));
+    }
+    window.open(finalUrl, "_blank");
+    searchCount++;
+    document.getElementById("searchCount").textContent = searchCount;
+
+    if (dork.dnsNote) {
+        setTimeout(function() {
+            showToast("DNSdumpster form-based -- opened page'e \"" + d + "\" yazin");
+        }, 500);
+    }
+
+    var statusEl = document.getElementById("statusText");
+    statusEl.style.color = "var(--green)";
+    statusEl.textContent = "LAUNCHED: " + dork.label.toUpperCase();
+    setTimeout(function() {
+        statusEl.style.color = "var(--muted)";
+        statusEl.textContent = "AWAITING TARGET";
+    }, 3000);
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+var toastTimer = null;
+function showToast(msg, warn) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.borderColor = warn ? "var(--danger)" : "var(--green)";
+    t.style.color = warn ? "var(--danger)" : "var(--green)";
+    t.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.classList.remove("show"); }, 2800);
+}
+
+// ─── KEYBOARD ────────────────────────────────────────────────────────────────
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") resetFilter();
+    if (e.key === "/" && document.activeElement !== document.getElementById("target")) {
+        e.preventDefault();
+        document.getElementById("filterInput").focus();
+    }
+});
+document.getElementById("target").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        var d = getDomain();
+        if (d) showToast("Target set: " + d);
+    }
+});
+
+buildUI();
+
+// Sticky search — no compact hiding needed, preview is always in bar
+window.addEventListener("scroll", function() {
+    var sec = document.querySelector(".search-section");
+    if (window.scrollY > 80) {
+        sec.classList.add("compact");
+    } else {
+        sec.classList.remove("compact");
+    }
+});
+</script>
+</body>
+</html>
